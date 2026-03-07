@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GTI Glass DXF Viewer</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="sidebar">
+        <h2>GTI DXF Viewer</h2>
+        <div id="file-section">
+          <label for="file-input" id="file-label">Open DXF File</label>
+          <input type="file" id="file-input" accept=".dxf" />
+        </div>
+        <hr />
+        <div id="tools-section">
+          <h3>Tools</h3>
+          <button id="tool-pan" class="tool-btn active" title="Pan (hold Middle Mouse or Space+Drag)">Pan</button>
+          <button id="tool-text" class="tool-btn" title="Click on canvas to add a text note">Add Text</button>
+          <button id="tool-dimension" class="tool-btn" title="Click near a segment to add a dimension override">Dimension Override</button>
+        </div>
+        <hr />
+        <div id="view-section">
+          <h3>View</h3>
+          <button id="btn-zoom-fit" title="Zoom to fit all geometry">Zoom to Fit</button>
+          <button id="btn-zoom-in" title="Zoom in">Zoom In</button>
+          <button id="btn-zoom-out" title="Zoom out">Zoom Out</button>
+        </div>
+        <hr />
+        <div id="layers-section">
+          <h3>Layers</h3>
+          <div id="layers-list"><em>No file loaded</em></div>
+        </div>
+        <hr />
+        <div id="annotations-section">
+          <h3>Annotations</h3>
+          <div id="annotations-list"><em>None</em></div>
+          <button id="btn-clear-annotations" style="margin-top:8px">Clear All</button>
+        </div>
+        <hr />
+        <div id="export-section">
+          <button id="btn-export-pdf">Export to PDF</button>
+        </div>
+        <div id="coords-display">X: — Y: —</div>
+      </div>
+      <div id="viewport">
+        <div id="drop-zone">
+          <div id="drop-zone-content">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Drag &amp; drop a <strong>.dxf</strong> file here</p>
+            <p style="font-size:0.85em;color:#9ca3af">or use the "Open DXF File" button</p>
+          </div>
+        </div>
+        <canvas id="render-canvas"></canvas>
+      </div>
+    </div>
+    <!-- Modal for text/dimension input -->
+    <div id="modal-overlay" class="hidden">
+      <div id="modal">
+        <h3 id="modal-title">Add Text</h3>
+        <input type="text" id="modal-input" placeholder="Enter text..." />
+        <div id="modal-buttons">
+          <button id="modal-cancel">Cancel</button>
+          <button id="modal-ok">OK</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

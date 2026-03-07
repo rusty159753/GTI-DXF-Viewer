@@ -1,0 +1,317 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+#app {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Sidebar ---- */
+#sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: #16213e;
+  border-right: 1px solid #0f3460;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  overflow-y: auto;
+  gap: 4px;
+}
+
+#sidebar h2 {
+  font-size: 1.1rem;
+  color: #e94560;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+#sidebar h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #8892b0;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+#sidebar hr {
+  border: none;
+  border-top: 1px solid #0f3460;
+  margin: 8px 0;
+}
+
+/* File input */
+#file-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#file-label {
+  display: inline-block;
+  padding: 8px 12px;
+  background: #0f3460;
+  color: #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+#file-label:hover {
+  background: #e94560;
+}
+
+#file-input {
+  display: none;
+}
+
+/* Tool buttons */
+.tool-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: #0f3460;
+  color: #e0e0e0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.tool-btn:hover {
+  background: #1a4a7a;
+}
+
+.tool-btn.active {
+  background: #e94560;
+  border-color: #ff6b81;
+  color: #fff;
+}
+
+/* View / export buttons */
+#view-section button,
+#export-section button,
+#annotations-section button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: #0f3460;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+
+#view-section button:hover,
+#export-section button:hover,
+#annotations-section button:hover {
+  background: #1a4a7a;
+}
+
+#btn-export-pdf {
+  background: #0a8f3c !important;
+}
+
+#btn-export-pdf:hover {
+  background: #0cb850 !important;
+}
+
+/* Layers list */
+#layers-list {
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 0.82rem;
+}
+
+#layers-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+#layers-list .layer-color-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid #555;
+  display: inline-block;
+}
+
+/* Annotations list */
+#annotations-list {
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 0.82rem;
+}
+
+.annotation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.annotation-item button {
+  background: #e94560;
+  border: none;
+  color: #fff;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+/* Coordinates */
+#coords-display {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 0.8rem;
+  color: #8892b0;
+  font-family: monospace;
+}
+
+/* ---- Viewport ---- */
+#viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #1a1a2e;
+}
+
+#render-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Drop zone */
+#drop-zone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  background: rgba(26, 26, 46, 0.95);
+  transition: background 0.2s;
+}
+
+#drop-zone.hidden {
+  display: none;
+}
+
+#drop-zone.dragover {
+  background: rgba(233, 69, 96, 0.15);
+  border: 3px dashed #e94560;
+}
+
+#drop-zone-content {
+  text-align: center;
+  color: #8892b0;
+}
+
+#drop-zone-content p {
+  margin-top: 12px;
+  font-size: 1rem;
+}
+
+/* ---- Modal ---- */
+#modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#modal-overlay.hidden {
+  display: none;
+}
+
+#modal {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 10px;
+  padding: 24px;
+  min-width: 320px;
+}
+
+#modal h3 {
+  margin-bottom: 12px;
+  color: #e94560;
+}
+
+#modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+  outline: none;
+  margin-bottom: 16px;
+}
+
+#modal-input:focus {
+  border-color: #e94560;
+}
+
+#modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#modal-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+#modal-cancel {
+  background: #0f3460;
+  color: #e0e0e0;
+}
+
+#modal-ok {
+  background: #e94560;
+  color: #fff;
+}
+
+#modal-cancel:hover {
+  background: #1a4a7a;
+}
+
+#modal-ok:hover {
+  background: #ff6b81;
+}
