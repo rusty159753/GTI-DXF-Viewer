@@ -32,19 +32,9 @@ The compiled static site is output to the `dist/` folder.
 
 ### Running the Production Build
 
-Option 1 — Python HTTP server:
-```bash
-cd dist
-python3 -m http.server 8080
-# open http://localhost:8080
-```
+Open `dist/index.html` directly in a browser — no server required. Copy the `dist/` folder to any Windows PC and double-click `index.html`.
 
-Option 2 — Vite preview:
-```bash
-npm run preview
-```
-
-Option 3 — Open `dist/index.html` directly in a browser (works for most browsers).
+For a step-by-step guide written for non-technical users, see **[USER-GUIDE.md](USER-GUIDE.md)**.
 
 ## Tech Stack
 
