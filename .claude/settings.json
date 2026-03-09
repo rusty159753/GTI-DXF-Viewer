@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/user/GTI-DXF-Viewer && npm run build 2>&1 && (nohup npx vite preview --port 5173 --host > /tmp/vite-server.log 2>&1 &) && sleep 2 && echo 'Server started on http://localhost:5173'"
+          }
+        ]
+      }
+    ]
+  }
+}
