@@ -131,9 +131,9 @@ export function renderDxf(
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
   ctx.save();
 
-  // Apply view transform: translate then scale
-  // World to screen: sx = (wx * scale) + offsetX, sy = (-wy * scale) + offsetY  (flip Y)
+  // Apply view transform: translate, rotate, then scale
   ctx.translate(view.offsetX, view.offsetY);
+  if (view.rotation) ctx.rotate(view.rotation);
   ctx.scale(view.scale, -view.scale); // flip Y
 
   const layers = dxf.tables?.layer?.layers as Record<string, ILayer> | undefined;

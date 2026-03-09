@@ -137,6 +137,53 @@ html, body {
   background: #0cb850 !important;
 }
 
+/* Rotation controls */
+#rotate-controls {
+  margin-top: 4px;
+}
+
+#rotate-controls button {
+  display: inline-block;
+  width: calc(50% - 2px);
+  padding: 8px 4px;
+  margin-bottom: 4px;
+  background: #0f3460;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.2s;
+}
+
+#rotate-controls button:hover {
+  background: #1a4a7a;
+}
+
+#rotation-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #8892b0;
+  margin-top: 2px;
+}
+
+#rotation-input {
+  width: 60px;
+  padding: 4px 6px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+#rotation-input:focus {
+  border-color: #e94560;
+}
+
 /* Layers list */
 #layers-list {
   max-height: 150px;

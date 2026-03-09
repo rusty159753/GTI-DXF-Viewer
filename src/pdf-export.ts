@@ -51,6 +51,7 @@ export function exportToPdf(
     scale: renderScale,
     offsetX: canvasW / 2 - centerX * renderScale,
     offsetY: canvasH / 2 + centerY * renderScale, // +Y because of flip
+    rotation: 0,
   };
 
   // Override colors for print (dark on white)

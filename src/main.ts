@@ -11,7 +11,7 @@ let annotations: Annotation[] = [];
 let currentTool: ToolMode = 'pan';
 let hiddenLayers = new Set<string>();
 
-const view: ViewState = { offsetX: 0, offsetY: 0, scale: 1 };
+const view: ViewState = { offsetX: 0, offsetY: 0, scale: 1, rotation: 0 };
 
 // ---- DOM Elements ----
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
@@ -30,9 +30,13 @@ const modalOk = document.getElementById('modal-ok')!;
 const toolPan = document.getElementById('tool-pan')!;
 const toolText = document.getElementById('tool-text')!;
 const toolDimension = document.getElementById('tool-dimension')!;
+const toolMove = document.getElementById('tool-move')!;
 const btnZoomFit = document.getElementById('btn-zoom-fit')!;
 const btnZoomIn = document.getElementById('btn-zoom-in')!;
 const btnZoomOut = document.getElementById('btn-zoom-out')!;
+const btnRotateCW = document.getElementById('btn-rotate-cw')!;
+const btnRotateCCW = document.getElementById('btn-rotate-ccw')!;
+const rotationInput = document.getElementById('rotation-input') as HTMLInputElement;
 const btnClearAnnotations = document.getElementById('btn-clear-annotations')!;
 const btnExportPdf = document.getElementById('btn-export-pdf')!;
 
@@ -191,6 +195,9 @@ function zoomToFit() {
 
   if (bboxW <= 0 || bboxH <= 0) return;
 
+  view.rotation = 0;
+  rotationInput.value = '0';
+
   const padding = 0.9; // 10% margin
   const scaleX = (w * padding) / bboxW;
   const scaleY = (h * padding) / bboxH;
@@ -218,14 +225,57 @@ btnZoomOut.addEventListener('click', () => {
   zoomAt(w / 2, h / 2, 1 / 1.3);
 });
 
+// ---- Rotation Controls ----
+function setRotation(angleDeg: number) {
+  // Rotate around the center of the viewport
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  // Get world point at center before rotation
+  const worldCenter = screenToWorld(cx, cy);
+
+  view.rotation = angleDeg * Math.PI / 180;
+
+  // Recompute offset so the same world point stays at center
+  const cos = Math.cos(view.rotation);
+  const sin = Math.sin(view.rotation);
+  const rwx = worldCenter.x * view.scale;
+  const rwy = -worldCenter.y * view.scale;
+  view.offsetX = cx - (rwx * cos - rwy * sin);
+  view.offsetY = cy - (rwx * sin + rwy * cos);
+
+  rotationInput.value = String(Math.round(angleDeg));
+  render();
+}
+
+btnRotateCW.addEventListener('click', () => {
+  const current = view.rotation * 180 / Math.PI;
+  setRotation(current + 90);
+});
+
+btnRotateCCW.addEventListener('click', () => {
+  const current = view.rotation * 180 / Math.PI;
+  setRotation(current - 90);
+});
+
+rotationInput.addEventListener('change', () => {
+  setRotation(parseFloat(rotationInput.value) || 0);
+});
+
 function zoomAt(screenX: number, screenY: number, factor: number) {
-  const wxBefore = (screenX - view.offsetX) / view.scale;
-  const wyBefore = -(screenY - view.offsetY) / view.scale;
+  const worldPt = screenToWorld(screenX, screenY);
 
   view.scale *= factor;
 
-  view.offsetX = screenX - wxBefore * view.scale;
-  view.offsetY = screenY + wyBefore * view.scale;
+  // Recompute offset so worldPt stays at (screenX, screenY)
+  const cos = Math.cos(view.rotation);
+  const sin = Math.sin(view.rotation);
+  const rwx = worldPt.x * view.scale;
+  const rwy = -worldPt.y * view.scale;
+  view.offsetX = screenX - (rwx * cos - rwy * sin);
+  view.offsetY = screenY - (rwx * sin + rwy * cos);
 
   render();
 }
@@ -235,16 +285,49 @@ let isPanning = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
 let spaceHeld = false;
+let draggingAnnotation: Annotation | null = null;
 
 function screenToWorld(sx: number, sy: number): { x: number; y: number } {
-  const wx = (sx - view.offsetX) / view.scale;
-  const wy = -(sy - view.offsetY) / view.scale;
+  // Reverse the transform: translate, rotate, scale
+  const dx = sx - view.offsetX;
+  const dy = sy - view.offsetY;
+  const cos = Math.cos(-view.rotation);
+  const sin = Math.sin(-view.rotation);
+  const rx = dx * cos - dy * sin;
+  const ry = dx * sin + dy * cos;
+  const wx = rx / view.scale;
+  const wy = -ry / view.scale;
   return { x: wx, y: wy };
 }
 
 function getCanvasXY(e: MouseEvent): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function worldToScreen(wx: number, wy: number): { x: number; y: number } {
+  const cos = Math.cos(view.rotation);
+  const sin = Math.sin(view.rotation);
+  const rwx = wx * view.scale;
+  const rwy = -wy * view.scale;
+  return {
+    x: (rwx * cos - rwy * sin) + view.offsetX,
+    y: (rwx * sin + rwy * cos) + view.offsetY,
+  };
+}
+
+function findAnnotationAt(sx: number, sy: number): Annotation | null {
+  const hitRadius = 15; // pixels
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const ann = annotations[i];
+    const sp = worldToScreen(ann.x, ann.y);
+    const dx = sx - sp.x;
+    const dy = sy - sp.y;
+    if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
+      return ann;
+    }
+  }
+  return null;
 }
 
 // Scroll zoom
@@ -266,6 +349,16 @@ canvas.addEventListener('mousedown', (e) => {
     canvas.style.cursor = 'grabbing';
     e.preventDefault();
     return;
+  }
+
+  if (e.button === 0 && currentTool === 'move' && dxf) {
+    const hit = findAnnotationAt(x, y);
+    if (hit) {
+      draggingAnnotation = hit;
+      canvas.style.cursor = 'grabbing';
+      e.preventDefault();
+      return;
+    }
   }
 
   if (e.button === 0 && dxf) {
@@ -301,6 +394,14 @@ canvas.addEventListener('mousedown', (e) => {
 canvas.addEventListener('mousemove', (e) => {
   const { x, y } = getCanvasXY(e);
 
+  if (draggingAnnotation) {
+    const world = screenToWorld(x, y);
+    draggingAnnotation.x = world.x;
+    draggingAnnotation.y = world.y;
+    render();
+    return;
+  }
+
   if (isPanning) {
     const dx = x - lastMouseX;
     const dy = y - lastMouseY;
@@ -312,12 +413,21 @@ canvas.addEventListener('mousemove', (e) => {
     return;
   }
 
+  // Update cursor for move tool hover
+  if (currentTool === 'move') {
+    const hit = findAnnotationAt(x, y);
+    canvas.style.cursor = hit ? 'grab' : 'default';
+  }
+
   // Update coordinate display
   const world = screenToWorld(x, y);
   coordsDisplay.textContent = `X: ${world.x.toFixed(2)}  Y: ${world.y.toFixed(2)}`;
 });
 
 canvas.addEventListener('mouseup', () => {
+  if (draggingAnnotation) {
+    draggingAnnotation = null;
+  }
   isPanning = false;
   updateCursor();
 });
@@ -353,6 +463,8 @@ function updateCursor() {
     canvas.style.cursor = 'text';
   } else if (currentTool === 'dimension') {
     canvas.style.cursor = 'crosshair';
+  } else if (currentTool === 'move') {
+    canvas.style.cursor = 'default';
   }
 }
 
@@ -362,12 +474,14 @@ function setTool(tool: ToolMode) {
   toolPan.classList.toggle('active', tool === 'pan');
   toolText.classList.toggle('active', tool === 'text');
   toolDimension.classList.toggle('active', tool === 'dimension');
+  toolMove.classList.toggle('active', tool === 'move');
   updateCursor();
 }
 
 toolPan.addEventListener('click', () => setTool('pan'));
 toolText.addEventListener('click', () => setTool('text'));
 toolDimension.addEventListener('click', () => setTool('dimension'));
+toolMove.addEventListener('click', () => setTool('move'));
 
 // ---- Annotations List ----
 function updateAnnotationsList() {
