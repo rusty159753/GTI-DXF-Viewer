@@ -1,0 +1,22 @@
+{
+  "name": "glass-dxf-viewer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "start": "npm run build && vite preview --port 5173"
+  },
+  "devDependencies": {
+    "@types/three": "^0.183.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "dxf-parser": "^1.1.2",
+    "jspdf": "^4.2.0",
+    "three": "^0.183.2"
+  }
+}
