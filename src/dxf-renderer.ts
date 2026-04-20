@@ -267,8 +267,8 @@ function drawLine(ctx: CanvasRenderingContext2D, e: ILineEntity) {
 
 function drawArc(ctx: CanvasRenderingContext2D, e: IArcEntity) {
   ctx.beginPath();
-  const startAngle = (e.startAngle || 0) * DEG;
-  const endAngle = (e.endAngle || 360) * DEG;
+  const startAngle = (e.startAngle ?? 0) * DEG;
+  const endAngle = (e.endAngle != null ? e.endAngle : 360) * DEG;
   ctx.arc(e.center.x, e.center.y, e.radius, startAngle, endAngle, false);
   ctx.stroke();
 }
