@@ -269,7 +269,7 @@ function drawArc(ctx: CanvasRenderingContext2D, e: IArcEntity) {
   ctx.beginPath();
   const startAngle = (e.startAngle ?? 0) * DEG;
   const endAngle = (e.endAngle != null ? e.endAngle : 360) * DEG;
-  ctx.arc(e.center.x, e.center.y, e.radius, startAngle, endAngle, false);
+  ctx.arc(e.center.x, e.center.y, e.radius, startAngle, endAngle, true);
   ctx.stroke();
 }
 
@@ -322,7 +322,7 @@ function drawBulgeArc(ctx: CanvasRenderingContext2D, p1: IPoint, p2: IPoint, bul
   const startAngle = Math.atan2(p1.y - cy, p1.x - cx);
   const endAngle = Math.atan2(p2.y - cy, p2.x - cx);
 
-  ctx.arc(cx, cy, radius, startAngle, endAngle, bulge < 0);
+  ctx.arc(cx, cy, radius, startAngle, endAngle, bulge > 0);
 }
 
 function drawPolyline(ctx: CanvasRenderingContext2D, e: IPolylineEntity) {
