@@ -21,6 +21,7 @@ const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const coordsDisplay = document.getElementById('coords-display')!;
 const layersList = document.getElementById('layers-list')!;
 const annotationsList = document.getElementById('annotations-list')!;
+const diagnosticsBar = document.getElementById('diagnostics-bar')!;
 const modalOverlay = document.getElementById('modal-overlay')!;
 const modalTitle = document.getElementById('modal-title')!;
 const modalInput = document.getElementById('modal-input') as HTMLInputElement;
@@ -71,7 +72,49 @@ function render() {
 }
 
 // ---- File Loading ----
+export interface DxfDiagnostics {
+  totalEntitiesInFile: Record<string, number>;
+  parsedEntities: Record<string, number>;
+  skippedTypes: string[];
+  skippedCount: number;
+  isBinary: boolean;
+}
+
+function scanRawEntityTypes(content: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const lines = content.split(/\r\n|\r|\n/);
+  let inEntities = false;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed === 'ENTITIES') { inEntities = true; continue; }
+    if (trimmed === 'ENDSEC' && inEntities) break;
+    if (inEntities && i > 0 && lines[i - 1].trim() === '0') {
+      if (trimmed !== 'ENDSEC' && trimmed !== 'SECTION') {
+        counts[trimmed] = (counts[trimmed] || 0) + 1;
+      }
+    }
+  }
+  return counts;
+}
+
+function isBinaryDxf(content: string): boolean {
+  return content.startsWith('AutoCAD Binary DXF');
+}
+
 function loadDxfString(content: string) {
+  if (isBinaryDxf(content)) {
+    alert(
+      'This is a Binary DXF file, which is not supported.\n\n' +
+      'Please re-export the file as ASCII DXF.\n\n' +
+      'In Autodesk Fusion: when exporting, look for a "DXF version" or ' +
+      '"file type" option and select ASCII/text format.\n\n' +
+      'In AutoCAD: use SAVEAS and choose "AutoCAD DXF (*.dxf)" (not binary).'
+    );
+    return;
+  }
+
+  const rawEntityCounts = scanRawEntityTypes(content);
+
   const parser = new DxfParser();
   try {
     dxf = parser.parseSync(content);
@@ -84,12 +127,35 @@ function loadDxfString(content: string) {
     return;
   }
 
+  const parsedCounts: Record<string, number> = {};
+  for (const e of dxf.entities) {
+    parsedCounts[e.type] = (parsedCounts[e.type] || 0) + 1;
+  }
+
+  const skippedTypes: string[] = [];
+  let skippedCount = 0;
+  for (const [type, count] of Object.entries(rawEntityCounts)) {
+    if (!parsedCounts[type]) {
+      skippedTypes.push(type);
+      skippedCount += count;
+    }
+  }
+
+  const diagnostics: DxfDiagnostics = {
+    totalEntitiesInFile: rawEntityCounts,
+    parsedEntities: parsedCounts,
+    skippedTypes,
+    skippedCount,
+    isBinary: false,
+  };
+
   dropZone.classList.add('hidden');
   annotations = [];
   hiddenLayers.clear();
 
   populateLayers();
   updateAnnotationsList();
+  showDiagnostics(diagnostics);
   zoomToFit();
 }
 
@@ -98,11 +164,33 @@ function loadFile(file: File) {
     alert('Please select a .dxf file.');
     return;
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    loadDxfString(reader.result as string);
+  // First read as ArrayBuffer to detect binary DXF
+  const binReader = new FileReader();
+  binReader.onload = () => {
+    const bytes = new Uint8Array(binReader.result as ArrayBuffer);
+    const sentinel = 'AutoCAD Binary DXF';
+    let isBin = true;
+    for (let i = 0; i < sentinel.length && i < bytes.length; i++) {
+      if (bytes[i] !== sentinel.charCodeAt(i)) { isBin = false; break; }
+    }
+    if (isBin) {
+      alert(
+        'This is a Binary DXF file, which is not supported.\n\n' +
+        'Please re-export the file as ASCII DXF.\n\n' +
+        'In Autodesk Fusion: when exporting, look for a "DXF version" or ' +
+        '"file type" option and select ASCII/text format.\n\n' +
+        'In AutoCAD: use SAVEAS and choose "AutoCAD DXF (*.dxf)" (not binary).'
+      );
+      return;
+    }
+    // It's ASCII — read as text
+    const textReader = new FileReader();
+    textReader.onload = () => {
+      loadDxfString(textReader.result as string);
+    };
+    textReader.readAsText(file);
   };
-  reader.readAsText(file);
+  binReader.readAsArrayBuffer(file.slice(0, 64));
 }
 
 // File input
@@ -141,6 +229,47 @@ viewport.addEventListener('drop', (e) => {
     loadFile(e.dataTransfer.files[0]);
   }
 });
+
+// ---- Diagnostics ----
+function showDiagnostics(diag: DxfDiagnostics) {
+  diagnosticsBar.classList.remove('hidden');
+  diagnosticsBar.innerHTML = '';
+
+  const totalParsed = Object.values(diag.parsedEntities).reduce((a, b) => a + b, 0);
+  const totalInFile = Object.values(diag.totalEntitiesInFile).reduce((a, b) => a + b, 0);
+
+  const summary = document.createElement('span');
+  summary.className = diag.skippedCount > 0 ? 'diag-warning' : 'diag-ok';
+  if (diag.skippedCount > 0) {
+    summary.textContent = `Loaded ${totalParsed} of ${totalInFile} entities (${diag.skippedCount} skipped)`;
+  } else {
+    summary.textContent = `Loaded ${totalParsed} entities`;
+  }
+  diagnosticsBar.appendChild(summary);
+
+  if (diag.skippedTypes.length > 0) {
+    const detail = document.createElement('span');
+    detail.className = 'diag-warning';
+    const counts = diag.skippedTypes.map(t => `${t} (${diag.totalEntitiesInFile[t]})`);
+    detail.textContent = `Unsupported: ${counts.join(', ')}`;
+    diagnosticsBar.appendChild(detail);
+  }
+
+  const types = document.createElement('span');
+  const parsedList = Object.entries(diag.parsedEntities)
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, c]) => `${t}: ${c}`)
+    .join(', ');
+  types.textContent = parsedList;
+  diagnosticsBar.appendChild(types);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'diag-close';
+  closeBtn.textContent = '\u00d7';
+  closeBtn.title = 'Close';
+  closeBtn.addEventListener('click', () => diagnosticsBar.classList.add('hidden'));
+  diagnosticsBar.appendChild(closeBtn);
+}
 
 // ---- Layers ----
 function populateLayers() {

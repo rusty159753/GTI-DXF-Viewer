@@ -8,6 +8,8 @@ import type { ISplineEntity } from 'dxf-parser/dist/entities/spline';
 import type { IEllipseEntity } from 'dxf-parser/dist/entities/ellipse';
 import type { IMtextEntity } from 'dxf-parser/dist/entities/mtext';
 import type { ITextEntity } from 'dxf-parser/dist/entities/text';
+import type { IPointEntity } from 'dxf-parser/dist/entities/point';
+import type { ISolidEntity } from 'dxf-parser/dist/entities/solid';
 import type { IDxf, ILayer } from 'dxf-parser';
 import AutoCadColorIndex from 'dxf-parser/dist/AutoCadColorIndex';
 import type { ViewState, Annotation } from './types';
@@ -109,6 +111,20 @@ export function computeBBox(entities: IEntity[]): BBox {
       case 'TEXT': {
         const tx = e as ITextEntity;
         expandBBox(bbox, tx.startPoint.x, tx.startPoint.y);
+        break;
+      }
+      case 'POINT': {
+        const pt = e as IPointEntity;
+        expandBBox(bbox, pt.position.x, pt.position.y);
+        break;
+      }
+      case 'SOLID': {
+        const sol = e as ISolidEntity;
+        if (sol.points) {
+          for (const p of sol.points) {
+            expandBBox(bbox, p.x, p.y);
+          }
+        }
         break;
       }
     }
@@ -232,6 +248,12 @@ function renderEntity(
     case 'TEXT':
       drawText(ctx, entity as ITextEntity);
       break;
+    case 'POINT':
+      drawPoint(ctx, entity as IPointEntity);
+      break;
+    case 'SOLID':
+      drawSolid(ctx, entity as ISolidEntity);
+      break;
   }
 }
 
@@ -336,7 +358,66 @@ function drawEllipse(ctx: CanvasRenderingContext2D, e: IEllipseEntity) {
   ctx.stroke();
 }
 
+function deBoor(degree: number, knots: number[], ctrlPts: IPoint[], t: number): { x: number; y: number } {
+  // Find knot span index k such that knots[k] <= t < knots[k+1]
+  const n = ctrlPts.length - 1;
+  let k = degree;
+  for (let i = degree; i <= n; i++) {
+    if (t >= knots[i] && t < knots[i + 1]) { k = i; break; }
+  }
+  // Handle t at the very end
+  if (t >= knots[n + 1]) k = n;
+
+  // Copy the relevant control points
+  const d: { x: number; y: number }[] = [];
+  for (let j = 0; j <= degree; j++) {
+    const idx = Math.max(0, Math.min(n, k - degree + j));
+    d.push({ x: ctrlPts[idx].x, y: ctrlPts[idx].y });
+  }
+
+  for (let r = 1; r <= degree; r++) {
+    for (let j = degree; j >= r; j--) {
+      const i = k - degree + j;
+      const denom = knots[i + degree - r + 1] - knots[i];
+      if (Math.abs(denom) < 1e-10) continue;
+      const alpha = (t - knots[i]) / denom;
+      d[j].x = (1 - alpha) * d[j - 1].x + alpha * d[j].x;
+      d[j].y = (1 - alpha) * d[j - 1].y + alpha * d[j].y;
+    }
+  }
+  return d[degree];
+}
+
 function drawSpline(ctx: CanvasRenderingContext2D, e: ISplineEntity) {
+  // If we have control points and knot values, use proper B-spline evaluation
+  if (e.controlPoints && e.controlPoints.length >= 2 && e.knotValues && e.knotValues.length > 0) {
+    const degree = e.degreeOfSplineCurve || 3;
+    const knots = e.knotValues;
+    const ctrlPts = e.controlPoints;
+
+    const tMin = knots[degree];
+    const tMax = knots[knots.length - 1 - degree];
+    if (tMax <= tMin) {
+      drawSplineFallback(ctx, e);
+      return;
+    }
+
+    const segments = Math.max(ctrlPts.length * 8, 64);
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+      const t = tMin + (tMax - tMin) * (i / segments);
+      const pt = deBoor(degree, knots, ctrlPts, t);
+      if (i === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+    return;
+  }
+
+  drawSplineFallback(ctx, e);
+}
+
+function drawSplineFallback(ctx: CanvasRenderingContext2D, e: ISplineEntity) {
   const pts = e.fitPoints || e.controlPoints;
   if (!pts || pts.length < 2) return;
 
@@ -348,14 +429,12 @@ function drawSpline(ctx: CanvasRenderingContext2D, e: ISplineEntity) {
     return;
   }
 
-  // Approximate with Catmull-Rom style interpolation
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
 
   if (pts.length === 3) {
     ctx.quadraticCurveTo(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
   } else {
-    // Use cubic bezier approximation through control points
     for (let i = 1; i < pts.length - 2; i++) {
       const xc = (pts[i].x + pts[i + 1].x) / 2;
       const yc = (pts[i].y + pts[i + 1].y) / 2;
@@ -392,4 +471,35 @@ function drawText(ctx: CanvasRenderingContext2D, e: ITextEntity) {
   ctx.font = `${h}px sans-serif`;
   ctx.fillText(e.text, 0, 0);
   ctx.restore();
+}
+
+function drawPoint(ctx: CanvasRenderingContext2D, e: IPointEntity) {
+  const size = 1;
+  const x = e.position.x;
+  const y = e.position.y;
+  ctx.beginPath();
+  ctx.moveTo(x - size, y);
+  ctx.lineTo(x + size, y);
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x, y + size);
+  ctx.stroke();
+}
+
+function drawSolid(ctx: CanvasRenderingContext2D, e: ISolidEntity) {
+  if (!e.points || e.points.length < 3) return;
+  ctx.beginPath();
+  ctx.moveTo(e.points[0].x, e.points[0].y);
+  ctx.lineTo(e.points[1].x, e.points[1].y);
+  // DXF SOLID vertex order: 0, 1, 3, 2 (swapped 2 and 3)
+  if (e.points.length >= 4) {
+    ctx.lineTo(e.points[3].x, e.points[3].y);
+    ctx.lineTo(e.points[2].x, e.points[2].y);
+  } else {
+    ctx.lineTo(e.points[2].x, e.points[2].y);
+  }
+  ctx.closePath();
+  ctx.globalAlpha = 0.3;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.stroke();
 }
